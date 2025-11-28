@@ -18,7 +18,7 @@ jobs:
         run: |
           echo "🔑 Setting up SSH key..."
           mkdir -p ~/.ssh
-          printf "%s\n" "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "📡 Scanning SSH host keys for ${{ secrets.EC2_HOST }}..."
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
