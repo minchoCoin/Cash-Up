@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #0c2d48;
+  background: linear-gradient(180deg, #c1e7ff 0%, #ffffff 35%, #f8ead8 100%);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.glass {
+  @apply bg-white/70 backdrop-blur-md shadow-lg;
+}
+
+.beach-gradient {
+  @apply bg-gradient-to-r from-beach-sea via-beach-mint to-beach-sky;
+}

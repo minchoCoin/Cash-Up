@@ -1,0 +1,18 @@
+node_modules
+
+# 가상환경
+server/.venv/
+
+# 파이썬 캐시
+**/__pycache__/
+*.py[cod]
+
+# DB 파일
+server/dev.db
+
+# 업로드 파일 (이미지 등)
+server/uploads/
+
+# 기타 IDE/에디터 파일 있으면 추가
+.vscode/
+.idea/

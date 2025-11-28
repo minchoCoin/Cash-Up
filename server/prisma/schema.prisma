@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String             @id @default(cuid())
+  provider       String
+  providerUserId String
+  displayName    String
+  createdAt      DateTime           @default(now())
+
+  photos     TrashPhoto[]
+  coupons    Coupon[]
+  summaries  UserDailySummary[]
+  binScans   BinScan[]
+
+  @@unique([provider, providerUserId])
+}
+
+model Festival {
+  id              String            @id @default(cuid())
+  name            String
+  budget          Int
+  perUserDailyCap Int
+  perPhotoPoint   Int
+  centerLat       Float?
+  centerLng       Float?
+  radiusMeters    Int?              @default(1000)
+  createdAt       DateTime          @default(now())
+
+  trashBins TrashBin[]
+  photos    TrashPhoto[]
+  summaries UserDailySummary[]
+  coupons   Coupon[]
+  binScans  BinScan[]
+}
+
+model TrashPhoto {
+  id         String      @id @default(cuid())
+  userId     String
+  festivalId String
+  imageUrl   String
+  hash       String
+  status     String      @default("PENDING")
+  points     Int
+  createdAt  DateTime    @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  festival Festival @relation(fields: [festivalId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model TrashBin {
+  id          String    @id @default(cuid())
+  festivalId  String
+  code        String    @unique
+  name        String
+  description String?
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime  @default(now())
+
+  festival Festival @relation(fields: [festivalId], references: [id])
+  scans    BinScan[]
+}
+
+model UserDailySummary {
+  id            String   @id @default(cuid())
+  userId        String
+  festivalId    String
+  date          String
+  totalPending  Int      @default(0)
+  totalActive   Int      @default(0)
+  totalConsumed Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  festival Festival @relation(fields: [festivalId], references: [id])
+
+  @@unique([userId, festivalId, date])
+}
+
+model Coupon {
+  id         String       @id @default(cuid())
+  userId     String
+  festivalId String
+  shopName   String
+  amount     Int
+  code       String       @unique
+  status     String       @default("ISSUED")
+  createdAt  DateTime     @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  festival Festival @relation(fields: [festivalId], references: [id])
+}
+
+model BinScan {
+  id         String   @id @default(cuid())
+  festivalId String
+  binId      String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  festival Festival @relation(fields: [festivalId], references: [id])
+  bin      TrashBin @relation(fields: [binId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+}
