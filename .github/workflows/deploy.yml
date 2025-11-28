@@ -1,0 +1,90 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST << 'ENDSSH'
+            set -e
+
+            echo "🚀 Starting deployment process..."
+
+            # 프로젝트 디렉토리로 이동
+            cd /var/www/cash-up
+
+            # Git pull
+            echo "📥 Pulling latest code from GitHub..."
+            git pull origin main
+
+            # 환경 변수 파일 업데이트
+            echo "🔧 Updating environment variables..."
+            cat > server/.env << 'ENDENV'
+          $ENV_PRODUCTION
+          ENDENV
+
+            # 배포 스크립트 실행
+            echo "🔨 Running deployment script..."
+            bash deploy.sh
+
+            echo "✅ Deployment process completed!"
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+            # PM2 프로세스 상태 확인
+            pm2 status
+
+            # API Health Check
+            echo "Testing API health endpoint..."
+            curl -f http://localhost:8000/api/health || exit 1
+
+            echo "✅ All services are running correctly!"
+          ENDSSH
+
+      - name: Cleanup SSH Key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Deployment Success Notification
+        if: success()
+        run: |
+          echo "================================================"
+          echo "✅ Deployment completed successfully!"
+          echo "================================================"
+          echo "Server: ${{ secrets.EC2_HOST }}"
+          echo "Time: $(date)"
+          echo "================================================"
+
+      - name: Deployment Failure Notification
+        if: failure()
+        run: |
+          echo "================================================"
+          echo "❌ Deployment failed!"
+          echo "================================================"
+          echo "Please check the logs above for details."
+          echo "================================================"
