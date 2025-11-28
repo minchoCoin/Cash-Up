@@ -17,8 +17,18 @@ jobs:
       - name: Setup SSH Key
         run: |
           echo "🔑 Setting up SSH key..."
+          if [ -z "${{ secrets.SSH_KEY }}" ] && [ -z "${{ secrets.SSH_KEY_B64 }}" ]; then
+            echo "❌ Error: SSH_KEY (or SSH_KEY_B64) secret is missing."
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          if [ -n "${{ secrets.SSH_KEY_B64 }}" ]; then
+            echo "📦 Decoding SSH key from SSH_KEY_B64..."
+            echo "${{ secrets.SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_rsa
+          else
+            # Preserve newlines from multiline PEM
+            printf "%s\n" "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          fi
           chmod 600 ~/.ssh/id_rsa
           echo "📡 Scanning SSH host keys for ${{ secrets.EC2_HOST }}..."
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
@@ -29,6 +39,10 @@ jobs:
           echo "📤 Copying .env.production to server..."
           if [ ! -f .env.production ]; then
             echo "❌ Error: .env.production file not found"
+            exit 1
+          fi
+          if [ ! -s ~/.ssh/id_rsa ]; then
+            echo "❌ Error: SSH key file is empty or missing. Check SSH_KEY/SSH_KEY_B64 secrets."
             exit 1
           fi
           scp -v -i ~/.ssh/id_rsa .env.production ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/ || {
