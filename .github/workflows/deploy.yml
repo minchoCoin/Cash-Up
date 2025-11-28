@@ -14,28 +14,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Copy environment file to server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: ".env.production"
+          target: "/tmp/"
 
-      - name: Add known hosts
-        run: |
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      - name: Create server env file
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cat > /tmp/server.env << 'EOF'
+            ${{ secrets.ENV_PRODUCTION }}
+            EOF
 
       - name: Deploy to EC2
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          # 환경 변수 파일을 임시 파일로 생성
-          echo "${{ secrets.ENV_PRODUCTION }}" > /tmp/.env.production
-
-          # 환경 변수 파일을 서버에 전송
-          scp -o StrictHostKeyChecking=no /tmp/.env.production $EC2_USER@$EC2_HOST:/tmp/.env.production
-
-          # SSH로 배포 실행
-          ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
             set -e
 
             echo "🚀 Starting deployment process..."
@@ -49,7 +54,7 @@ jobs:
 
             # 환경 변수 파일 업데이트
             echo "🔧 Updating environment variables..."
-            mv /tmp/.env.production server/.env
+            mv /tmp/server.env server/.env
 
             # 프론트엔드 환경 변수 생성
             echo "VITE_API_URL=/api" > .env.production
@@ -59,15 +64,16 @@ jobs:
             bash deploy.sh
 
             echo "✅ Deployment process completed!"
-          ENDSSH
-
-          # 임시 파일 삭제
-          rm -f /tmp/.env.production
 
       - name: Verify deployment
-        run: |
-          echo "🔍 Verifying deployment..."
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "🔍 Verifying deployment..."
+
             # PM2 프로세스 상태 확인
             pm2 status
 
@@ -76,7 +82,6 @@ jobs:
             curl -f http://localhost:8000/api/health || exit 1
 
             echo "✅ All services are running correctly!"
-          ENDSSH
 
       - name: Deployment Success Notification
         if: success()
